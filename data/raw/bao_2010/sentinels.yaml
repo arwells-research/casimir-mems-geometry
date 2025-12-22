@@ -1,0 +1,31 @@
+# data/raw/bao_2010/sentinels.yaml
+#
+# Sentinels for Bao et al., PRL 105 (2010)
+# These validate the digitized ratio curve eta(d) = measured / PFA.
+#
+# Convention:
+# - CSV stores eta_measured_over_pfa (dimensionless)
+# - Enforcement is applied directly to the digitized ratio
+#
+# Absolute tolerances reflect typical plot digitization uncertainty
+# for smooth ratio curves.
+
+- name: "bao_short_range"
+  d_m: 3.00e-07
+  y: 0.962
+  tol_abs: 0.01
+
+- name: "bao_mid_low"
+  d_m: 6.00e-07
+  y: 0.930
+  tol_abs: 0.01
+
+- name: "bao_mid_high"
+  d_m: 1.00e-06
+  y: 0.888
+  tol_abs: 0.012
+
+- name: "bao_long_range"
+  d_m: 2.00e-06
+  y: 0.832
+  tol_abs: 0.015

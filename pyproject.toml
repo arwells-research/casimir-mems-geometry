@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "casimir-mems-geometry"
+version = "0.0.0"
+description = "Casimir/MEMS geometry benchmarks with leveled validation contracts (A/B/C)."
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "MIT"}
+authors = [
+  {name = "A. R. Wells", email = "arwells.research@proton.me"},
+]
+dependencies = [
+  "numpy",
+  "matplotlib",
+  "pyyaml",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

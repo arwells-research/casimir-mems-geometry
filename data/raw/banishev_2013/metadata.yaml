@@ -1,0 +1,41 @@
+paper: "Banishev et al., PRL 110, 250403 (2013)"
+observable: "force_gradient_ratio"
+
+geometry:
+  sphere_R_m: 1.50e-04
+  corrugation_period_m: 5.705e-07
+  corrugation_amplitude_m: 5.94e-08
+
+thresholds:
+  kd_warn: 1.0      # DE validity limit (start shading)
+  kd_refuse: 6.0    # hard stop (beyond dataset)
+
+data_convention:
+  y_kind: "ratio_over_pfa"
+  y_column: "eta_measured_over_pfa"
+  sign: "positive"
+
+digitization:
+  source: "Banishev et al., PRL 110 (2013)"
+  figure: "Fig. 3"
+  x_axis: "separation (m)"
+  y_axis: "ratio F'exp / F'PFA_flat"
+  notes: "Digitized ratio curve; stored dimensionless."
+
+model:
+  levelA:
+    plane_plane: "ideal_metal"   # what P_pp_ideal represents
+    corrugation_avg: "local_pfa" # <P(d+a sin)> / P(d)
+
+  levelB:
+    de:
+      enabled: true
+      beta_model: "ideal_em_constant"   # current implementation
+      intent: "diagnostic_bridge"
+      disclaimer: >
+        Level B uses ideal-conductor EM derivative expansion to quantify geometric
+        beyond-PFA sensitivity. Banishev 2013 data are Au at 300 K; mismatches are
+        expected and indicate finite conductivity/temperature effects reserved for
+        Level C.
+        # later: "lifshitz_au_300k" or "tabulated_alpha(d)" etc.
+        notes: "Uses Bimonte beta_EM constant for ideal metals; not Au optical data."

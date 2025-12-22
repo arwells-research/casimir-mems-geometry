@@ -1,0 +1,23 @@
+case_id: levelc_c8_scattmin_canonical
+
+geometry:
+  corrugation_period_m: 5.705e-07
+  d_min_m: 1.200e-07
+  d_max_m: 6.000e-07
+  n_points: 41
+  amplitude:
+    mode: relative_to_dmin
+    a_over_dmin: 0.495
+    # 0.495 * 1.2e-07 = 5.94e-08 (matches the “canonical” amplitude you wanted)
+
+thresholds:
+  kd_warn: 1.0
+  kd_refuse: 6.0
+
+levelC:
+  backend: ideal_scattering_minimal_v0
+  convergence:
+    n_modes_start: 8
+    n_modes_step: 8
+    n_modes_max: 256
+    tol: 1.0e-5

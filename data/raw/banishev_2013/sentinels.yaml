@@ -1,0 +1,22 @@
+# Sentinels lock the digitization against accidental edits or CSV column mixups.
+# These are checked by linear interpolation on the digitized curve.
+
+- name: "left_edge"
+  d_m: 1.215e-07
+  y: 1.018
+  tol_abs: 2.0e-03
+
+- name: "midpoint"
+  d_m: 3.111e-07
+  y: 1.463
+  tol_abs: 3.0e-03
+
+- name: "high_curvature"
+  d_m: 4.321e-07
+  y: 2.112
+  tol_abs: 4.0e-03
+
+- name: "right_edge"
+  d_m: 5.019e-07
+  y: 2.698
+  tol_abs: 5.0e-03

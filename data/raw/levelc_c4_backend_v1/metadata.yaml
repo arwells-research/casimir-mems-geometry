@@ -1,0 +1,48 @@
+# FILE: data/raw/levelc_c4_backend_v1/metadata.yaml
+paper: "Canonical Level C benchmark C4 (synthetic; harness-only; backend switch test)"
+observable: "normalized_ratio"
+
+geometry:
+  profile: "sinusoid_1d_vs_flat"
+  corrugation_period_m: 5.705e-07
+  d_min_m: 1.20e-07
+  d_max_m: 6.00e-07
+  n_points: 41
+
+  amplitude:
+    mode: "relative_to_dmin"
+    a_over_dmin: 0.2
+    a_m: 0.0
+
+thresholds:
+  kd_warn: 1.0
+  kd_refuse: 6.0
+
+data_convention:
+  y_kind: "ratio_over_flat"
+  y_column: "eta_synthetic"
+  sign: "positive"
+
+scope:
+  levelB:
+    de_model: "ideal_conductor_em"
+    intent: "diagnostic_bridge"
+    disclaimer: >
+      C4 is a synthetic harness case to prove Level C backend selection is
+      metadata-driven. It switches the toy backend id to toy_scattering_v1.
+    notes: "Harness-only: no claim of physical scattering."
+
+levelC:
+  backend: "toy_scattering_v1"
+  purpose: "synthetic_harness_only"
+  notes: >
+    NOT PHYSICAL. This benchmark exists only to validate Level C convergence
+    machinery, CSV schema, refusal masking, and backend switching.
+  convergence:
+    n_modes_start: 8
+    n_modes_step: 8
+    n_modes_max: 128
+    tol: 1.0e-4
+
+  toy_scattering:
+    alpha: 0.15

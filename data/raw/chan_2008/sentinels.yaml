@@ -1,0 +1,31 @@
+# data/raw/chan_2008/sentinels.yaml
+#
+# Sentinels for Chan et al., PRL 101 (2008)
+# These validate the digitized experimental force-gradient curve.
+#
+# Convention:
+# - CSV stores magnitude |dF/dd| in N/m
+# - metadata.yaml declares sign: "magnitude"
+# - enforcement is applied to the signed curve (negative values)
+#
+# Tolerances are relative and reflect typical plot digitization uncertainty.
+
+- name: "chan_short_range"
+  d_m: 1.50e-07
+  y: -1.15e-03
+  tol_rel: 0.08
+
+- name: "chan_mid_low"
+  d_m: 2.50e-07
+  y: -1.80e-04
+  tol_rel: 0.10
+
+- name: "chan_mid_high"
+  d_m: 3.50e-07
+  y: -4.90e-05
+  tol_rel: 0.10
+
+- name: "chan_long_range"
+  d_m: 5.00e-07
+  y: -1.23e-05
+  tol_rel: 0.12

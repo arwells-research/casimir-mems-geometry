@@ -1,0 +1,26 @@
+geometry:
+  corrugation_period_m: 5.705e-07
+  d_min_m: 1.200e-07
+  d_max_m: 6.000e-07
+  n_points: 41
+  amplitude:
+    mode: relative_to_dmin
+    a_over_dmin: 0.20
+
+thresholds:
+  kd_warn: 1.0
+  kd_refuse: 6.0
+
+levelC:
+  backend: ideal_perturb_scattering_v0
+  convergence:
+    n_modes_start: 8
+    n_modes_step: 8
+    n_modes_max: 256
+    tol: 1.0e-5
+  # Parameters for the "real" Level C backend (ideal-metal perturbative scattering).
+  # These are intentionally explicit in metadata to keep runs reproducible.
+  ideal_perturb_scattering:
+    alpha: 0.35
+    levelB_samples: 2048
+      

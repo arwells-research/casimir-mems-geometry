@@ -1,0 +1,23 @@
+paper: "Bao et al., PRL 105 (2010)"
+observable: "force_gradient"
+notes:
+  - "Populate geometry params and digitized data before running reproduction."
+  - "Level A maps RectTrenchGrating(w) to the bottom-surface length l2; ignores explicit sidewalls (p3) used in the paper's PFA expression."
+geometry:
+  sphere_R_m: 5.0e-05
+  trench_period_p_m: 4.0e-07
+  trench_width_w_m: 1.991e-07         
+  trench_top_width_l1_m: 1.853e-07     
+  trench_depth_h_m: 9.8e-08
+calibration:
+  d0_m: 0.0
+data_convention:
+  y_kind: "ratio_over_pfa"
+  y_column: "eta_measured_over_pfa"
+  pfa_definition: "bao_eq1_sidewalls"
+digitization:
+  source: "Bao et al., PRL 105 (2010)"
+  figure: "Fig. 2"
+  x_axis: "separation (nm)"
+  y_axis: "ratio measured / PFA"
+  notes: "Digitized ratio curve; stored dimensionless."

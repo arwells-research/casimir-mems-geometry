@@ -1,0 +1,23 @@
+paper: "Chan et al., PRL 101 (2008)"
+observable: "force_gradient"
+
+geometry:
+  sphere_R_m: 5.0e-05          # example: 50 µm
+  trench_period_p_m: 4.0e-07   # example: 400 nm
+  trench_width_w_m: 2.0e-07    # example: 200 nm (TRENCH width!)
+  trench_depth_h_m: 3.0e-07    # example: 300 nm
+
+calibration:
+  d0_m: 0.0
+
+data_convention:
+  y_kind: "force_gradient"
+  y_column: "force_gradient_mag_N_per_m"
+  sign: "magnitude"
+
+digitization:
+  source: "Chan et al., PRL 101 (2008)"
+  figure: "Fig. 3(b)"
+  x_axis: "separation (nm)"
+  y_axis: "force gradient dF/dd (N/m)"
+  notes: "Digitized directly from published plot; values converted to SI."
