@@ -39,16 +39,14 @@ import yaml
 
 # Level A plane-plane model (ideal metal)
 from casimir_mems.levelA.plane_plane import P_pp_ideal
-
+from casimir_mems.levelB import LEVELB_BACKEND_ID
+from casimir_mems.levelB.validity import compute_validity_sinusoid
+from casimir_mems.levelB.derivative_expansion import eta_levelB_DE_ideal, BETA_EM_IDEAL
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = REPO_ROOT / "data" / "raw" / "banishev_2013"
 FIG_DIR = REPO_ROOT / "figures" / "derived"
 OUT_DIR = REPO_ROOT / "outputs"
-
-# Bimonte et al. (EPL 97 (2012) 50001): for EM perfect conductors
-#   beta_EM = (2/3) * (1 - 15/pi^2)
-BETA_EM_IDEAL = (2.0 / 3.0) * (1.0 - 15.0 / (math.pi ** 2))
 
 def banner(tag: str, **kv: object) -> None:
     items = " ".join([f"{k}={v}" for k, v in kv.items()])
@@ -209,50 +207,6 @@ def eta_level_a_local_pfa_avg(d: np.ndarray, *, a: float, period: float, samples
         out[i] = Pav / float(P0[i])
     return out
 
-
-def eta_level_b_derivative_expansion_ideal(
-    d: np.ndarray,
-    *,
-    a: float,
-    period: float,
-    samples: int = 4096,
-    beta: float = BETA_EM_IDEAL,
-) -> np.ndarray:
-    """
-    Level B (Derivative Expansion) for *ideal-metal* EM using Bimonte et al. beta_EM.
-
-    For one corrugated surface vs flat:
-      U_corr ≈ < U(H) + U(H)*beta*(∇H)^2 >
-    Pressure is P = -dU/dd, and since U'(H) = -P(H), we get:
-      P_corr(d) = < P(H) * (1 + beta*(∇H)^2) >
-    Therefore:
-      eta_B(d) = P_corr(d) / P(d)
-
-    with H = d + a sin(kx), and (∇H)^2 = (a k cos(kx))^2.
-    """
-    if samples < 256:
-        raise ValueError("samples too low; use >= 256.")
-    k = 2.0 * math.pi / period
-    x = np.linspace(0.0, 2.0 * math.pi / k, samples, endpoint=False)
-    sin = np.sin(k * x)
-    cos = np.cos(k * x)
-
-    P0 = P_pp_ideal(d)
-    out = np.empty_like(d, dtype=float)
-
-    grad2 = (a * k * cos) ** 2  # (∇H)^2 across x
-
-    for i, di in enumerate(d):
-        H = di + a * sin
-        if np.any(H <= 0.0):
-            raise ValueError(f"Non-positive local gap encountered at d={di:.3e} with amplitude a={a:.3e}")
-        PH = P_pp_ideal(H)
-        Pcorr = float(np.mean(PH * (1.0 + beta * grad2)))
-        out[i] = Pcorr / float(P0[i])
-
-    return out
-
-
 def write_run_csv(
     path: Path,
     *,
@@ -260,35 +214,119 @@ def write_run_csv(
     eta_exp: np.ndarray,
     eta_a: np.ndarray,
     eta_b: np.ndarray,
+    levelB_backend_id: str,
     kd: np.ndarray,
+    ak: np.ndarray,
+    ak2: np.ndarray,
+    validity_score: np.ndarray,
     warned: np.ndarray,
     refused: np.ndarray,
 ) -> None:
-    if not (d.size == eta_exp.size == eta_a.size == eta_b.size == kd.size == warned.size == refused.size):
+    """
+    Write the Banishev 2013 run-audit CSV.
+
+    Contract-bound columns (B0):
+      separation_m        float
+      eta_exp             float
+      eta_levelA          float
+      eta_levelB          float
+      levelB_backend_id   string  (frozen identifier, e.g. de_ideal_v0)
+      kd                  float
+      ak                  float   (slope amplitude proxy: a*k)
+      ak2                 float   (ak^2)
+      validity_score      float   (geometry confidence index in [0,1])
+      warned              int     (kd > kd_warn)
+      refused             int     (kd > kd_refuse)
+    """
+    if not (
+        d.size
+        == eta_exp.size
+        == eta_a.size
+        == eta_b.size
+        == kd.size
+        == ak.size
+        == ak2.size
+        == validity_score.size
+        == warned.size
+        == refused.size
+    ):
         raise ValueError("Run CSV write: array sizes do not match.")
 
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="") as f:
         w = csv.writer(f)
-        w.writerow([
-            "separation_m",
-            "eta_exp",
-            "eta_levelA",
-            "eta_levelB",
-            "kd",
-            "warned",
-            "refused",
-        ])
-        for di, ee, ea, eb, kdi, wn, rf in zip(d, eta_exp, eta_a, eta_b, kd, warned, refused):
-            w.writerow([
-                f"{di:.12e}",
-                f"{ee:.12e}",
-                f"{ea:.12e}",
-                f"{eb:.12e}",
-                f"{kdi:.12e}",
-                int(bool(wn)),
-                int(bool(rf)),
-            ])
+        w.writerow(
+            [
+                "separation_m",
+                "eta_exp",
+                "eta_levelA",
+                "eta_levelB",
+                "levelB_backend_id",
+                "kd",
+                "ak",
+                "ak2",
+                "validity_score",
+                "warned",
+                "refused",
+            ]
+        )
+        for di, ee, ea, eb, kdi, aki, ak2i, vsi, wn, rf in zip(
+            d, eta_exp, eta_a, eta_b, kd, ak, ak2, validity_score, warned, refused
+        ):
+            w.writerow(
+                [
+                    f"{di:.12e}",
+                    f"{ee:.12e}",
+                    f"{ea:.12e}",
+                    f"{eb:.12e}",
+                    str(levelB_backend_id),
+                    f"{kdi:.12e}",
+                    f"{aki:.12e}",
+                    f"{ak2i:.12e}",
+                    f"{vsi:.12e}",
+                    int(bool(wn)),
+                    int(bool(rf)),
+                ]
+            )
+
+def levelB_diagnostics_b0(
+    d: np.ndarray,
+    *,
+    amplitude_m: float,
+    period_m: float,
+    kd_warn: float,
+    kd_refuse: float,
+) -> tuple[str, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Compute Level B (B0) per-point diagnostics for the sinusoid geometry.
+
+    Returns (all arrays same shape as d):
+      backend_id, kd, ak, ak2, validity_score, warned, refused
+
+    Notes:
+    - This is purely geometric diagnostics + contract ID.
+    - The *numerical* Level B curve eta_B is computed elsewhere (via casimir_mems.levelB).
+    """
+    from casimir_mems.levelB import LEVELB_BACKEND_ID
+    from casimir_mems.levelB.validity import compute_validity_sinusoid
+
+    diag = compute_validity_sinusoid(
+        d,
+        period=period_m,
+        amplitude=amplitude_m,
+        kd_warn=kd_warn,
+        kd_refuse=kd_refuse,
+    )
+
+    return (
+        LEVELB_BACKEND_ID,
+        diag.kd,
+        diag.ak,
+        diag.ak2,
+        diag.validity_score,
+        diag.warned,
+        diag.refused,
+    )
 
 
 def main() -> None:
@@ -323,13 +361,16 @@ def main() -> None:
         curve_label="Banishev 2013 digitized ratio eta (measured/PFA_flat)",
     )
 
-    k = 2.0 * math.pi / cfg.period_m
-    kd = k * d
-    warned = kd > cfg.kd_warn
-    refused = kd > cfg.kd_refuse
+    levelB_backend_id, kd, ak, ak2, validity_score, warned, refused = levelB_diagnostics_b0(
+        d,
+        amplitude_m=cfg.amplitude_m,
+        period_m=cfg.period_m,
+        kd_warn=cfg.kd_warn,
+        kd_refuse=cfg.kd_refuse,
+    )
 
     eta_a = eta_level_a_local_pfa_avg(d, a=cfg.amplitude_m, period=cfg.period_m, samples=4096)
-    eta_b = eta_level_b_derivative_expansion_ideal(d, a=cfg.amplitude_m, period=cfg.period_m, samples=4096)
+    eta_b = eta_levelB_DE_ideal(d, a=cfg.amplitude_m, period=cfg.period_m, samples=4096)
 
     ensure_dir(FIG_DIR)
     ensure_dir(OUT_DIR)
@@ -341,7 +382,11 @@ def main() -> None:
         eta_exp=eta_exp,
         eta_a=eta_a,
         eta_b=eta_b,
+        levelB_backend_id=levelB_backend_id,
         kd=kd,
+        ak=ak,
+        ak2=ak2,
+        validity_score=validity_score,
         warned=warned,
         refused=refused,
     )
@@ -371,7 +416,7 @@ def main() -> None:
 
     plt.plot(d, eta_exp, marker="o", linestyle="none", label="Experiment (digitized)")
     plt.plot(d, eta_a, linestyle="--", label="Level A: local PFA averaging")
-    plt.plot(d, eta_b, linestyle="-", label=f"Level B: DE (ideal metal, beta={BETA_EM_IDEAL:.6g})")
+    plt.plot(d, eta_b, linestyle="-", label=f"Level B: {levelB_backend_id} (beta={BETA_EM_IDEAL:.6g})")
 
     plt.xlabel("Separation d (m)")
     plt.ylabel("Normalized force gradient η = F'exp / F'PFA_flat")

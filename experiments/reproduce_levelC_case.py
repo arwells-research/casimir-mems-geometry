@@ -39,9 +39,6 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 FIG_DIR = REPO_ROOT / "figures" / "derived"
 OUT_DIR = REPO_ROOT / "outputs"
 
-# Ideal-metal EM DE coefficient used by this repository (Option 1 diagnostic Level B)
-BETA_EM_IDEAL = (2.0 / 3.0) * (1.0 - 15.0 / (math.pi**2))
-
 
 def banner(tag: str, **kv: object) -> None:
     items = " ".join([f"{k}={v}" for k, v in kv.items()])
@@ -194,32 +191,6 @@ def eta_levelA_local_avg(d: np.ndarray, *, a: float, period: float, samples: int
         out[i] = Pav / float(P0[i])
     return out
 
-
-def eta_levelB_DE_ideal(d: np.ndarray, *, a: float, period: float, samples: int = 4096) -> np.ndarray:
-    """
-    Level B (Option 1 diagnostic): ideal-metal EM DE correction.
-      η_B(d) = < P(H) [1 + β_EM (∇H)^2] > / P(d)
-    """
-    if samples < 256:
-        raise ValueError("samples too low; use >= 256.")
-    k = 2.0 * math.pi / period
-    x = np.linspace(0.0, 2.0 * math.pi / k, samples, endpoint=False)
-    sinx = np.sin(k * x)
-    cosx = np.cos(k * x)
-    grad2 = (a * k * cosx) ** 2
-
-    P0 = P_pp_ideal(d)
-    out = np.empty_like(d, dtype=float)
-    for i, di in enumerate(d):
-        H = di + a * sinx
-        if np.any(H <= 0.0):
-            raise ValueError(f"Non-positive local gap at d={di:.3e} (a={a:.3e})")
-        PH = P_pp_ideal(H)
-        Pcorr = float(np.mean(PH * (1.0 + BETA_EM_IDEAL * grad2)))
-        out[i] = Pcorr / float(P0[i])
-    return out
-
-
 def write_case_csv(
     path: Path,
     *,
@@ -305,6 +276,37 @@ def _build_levelc_core_by_id(backend_id: str, cfg: CaseConfig, *, etaB: np.ndarr
         return IdealScatteringMinimalBackend()
     raise ValueError(f"Unsupported backend_id={backend_id!r}")
 
+def levelB_b0_diagnostics_for_case(
+    d: np.ndarray,
+    *,
+    amplitude_m: float,
+    period_m: float,
+    kd_warn: float,
+    kd_refuse: float,
+) -> tuple[str, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Compute Level B (B0) diagnostics used by the Level C harness.
+
+    Returns:
+      (levelB_backend_id, kd, warned, refused)
+
+    Notes:
+    - kd/warn/refuse are used for shading + refusal masking.
+    - Level B's own per-point diagnostics (ak, ak2, validity_score) are not
+      written to the Level C CSV because its schema is locked to match C0.
+    """
+    from casimir_mems.levelB import LEVELB_BACKEND_ID
+    from casimir_mems.levelB.validity import compute_validity_sinusoid
+
+    diag = compute_validity_sinusoid(
+        d,
+        period=period_m,
+        amplitude=amplitude_m,
+        kd_warn=kd_warn,
+        kd_refuse=kd_refuse,
+    )
+    return (LEVELB_BACKEND_ID, diag.kd, diag.warned, diag.refused)
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--case-dir", required=True, help="Case directory under data/raw/ (or absolute path)")
@@ -315,6 +317,9 @@ def main() -> None:
     )
     args = ap.parse_args()
 
+    # Import frozen Level B backend (single source of truth)
+    from casimir_mems.levelB.derivative_expansion import eta_levelB_DE_ideal
+
     case_dir_arg = Path(args.case_dir)
     case_dir = (REPO_ROOT / case_dir_arg).resolve() if not case_dir_arg.is_absolute() else case_dir_arg.resolve()
     if not case_dir.exists():
@@ -324,12 +329,18 @@ def main() -> None:
     d = build_separation_grid(cfg)
     a = resolve_amplitude(cfg)
 
-    k = 2.0 * math.pi / cfg.period_m
-    kd = k * d
-    warned = kd > cfg.kd_warn
-    refused = kd > cfg.kd_refuse
+    # B0: compute kd/warn/refuse consistently with Level B validity module
+    levelB_backend_id, kd, warned, refused = levelB_b0_diagnostics_for_case(
+        d,
+        amplitude_m=a,
+        period_m=cfg.period_m,
+        kd_warn=cfg.kd_warn,
+        kd_refuse=cfg.kd_refuse,
+    )
 
     etaA = eta_levelA_local_avg(d, a=a, period=cfg.period_m, samples=4096)
+
+    # Frozen Level B curve (ideal-metal DE)
     etaB = eta_levelB_DE_ideal(d, a=a, period=cfg.period_m, samples=4096)
 
     core = _build_levelc_core(cfg, etaB=etaB)
@@ -349,6 +360,7 @@ def main() -> None:
         d_max_m=f"{cfg.d_max_m:.3e}",
         kd_warn=cfg.kd_warn,
         kd_refuse=cfg.kd_refuse,
+        levelB_backend=levelB_backend_id,
         levelC_backend=cfg.levelc_backend,
         sweep=f"{sweep.n_modes_start}..{sweep.n_modes_max} step {sweep.n_modes_step}",
         tol=f"{sweep.tol:.1e}",
@@ -368,6 +380,7 @@ def main() -> None:
     out_csv = OUT_DIR / f"{cfg.case_id}_run.csv"
     out_png = FIG_DIR / f"{cfg.case_id}_overlay.png"
 
+    # CSV schema remains locked (matches C0); no Level B diagnostic columns added here.
     write_case_csv(
         out_csv,
         d=d,
@@ -390,13 +403,9 @@ def main() -> None:
         plt.axvspan(d_ref, float(d[-1]), alpha=0.30, label=f"Refusal: k d > {cfg.kd_refuse:g}")
 
     plt.plot(d, etaA, linestyle="--", label="Level A: local averaging (ideal)")
-    plt.plot(d, etaB, linestyle="-", label=f"Level B: DE (ideal, beta={BETA_EM_IDEAL:.6g})")
-    plt.plot(
-        d,
-        resC.eta_levelC,
-        linestyle="-.",
-        label=f"Level C: {cfg.levelc_backend}",
-    )
+    plt.plot(d, etaB, linestyle="-", label=f"Level B: {levelB_backend_id}")
+    plt.plot(d, resC.eta_levelC, linestyle="-.", label=f"Level C: {cfg.levelc_backend}")
+
     # Optional diagnostic: compare Level C backends on the same geometry/grid.
     if args.compare_backends:
         compare_ids = [
@@ -412,12 +421,9 @@ def main() -> None:
                 d, a=a, period=cfg.period_m, n_modes=cfg.n_modes_start, tol=cfg.tol, refused=refused
             )
 
-            # Skip re-plot of the already-selected primary backend to avoid duplicates.
             if bid == cfg.levelc_backend:
                 continue
 
-            # Slightly de-emphasize comparison curves so the primary backend reads first.
-            # Toy backend tends to be the loudest; fade it a bit more.
             cmp_alpha = 0.65
             cmp_lw = 2.0
             if bid == "toy_scattering_v0":
@@ -432,7 +438,6 @@ def main() -> None:
                 label=f"Level C cmp: {bid}",
             )
 
-        # Save an extra figure name (diagnostic-only)
         out_png_cmp = FIG_DIR / f"{cfg.case_id}_overlay_compare_backends.png"
         plt.tight_layout()
         plt.savefig(out_png_cmp, dpi=200, bbox_inches="tight")

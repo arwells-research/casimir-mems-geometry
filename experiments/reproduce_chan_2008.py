@@ -40,7 +40,7 @@ OUT_DIR = REPO_ROOT / "outputs"
 
 def banner(tag: str, **kv: object) -> None:
     items = " ".join([f"{k}={v}" for k, v in kv.items()])
-    print(f"[{tag}] {items}".rstrip())
+    print(f"[{tag}] {items}".rstrip(), flush=True)
 
 @dataclass(frozen=True)
 class Chan2008Config:
@@ -240,9 +240,9 @@ def main() -> None:
 
     banner(
         "CHAN2008",
-        y_kind="force_gradient",
+        y_kind=str(cfg.y_kind),
         y_column=str(cfg.y_column),
-        sign=str(getattr(cfg, "sign", "unknown")),
+        sign=str(cfg.sign),
         d_min_nm=f"{float(np.min(d))*1e9:.1f}",
         d_max_nm=f"{float(np.max(d))*1e9:.1f}",
         n_points=int(d.size),
@@ -320,8 +320,8 @@ def main() -> None:
     )
 
     print("Wrote:")
-    print(f"  {FIG_DIR / 'chan_2008_overlay.png'}")
-    print(f"  {FIG_DIR / 'chan_2008_eta.png'}")
+    print(f"  {out_overlay}")
+    print(f"  {out_eta}")
     print(f"  {run_csv}")
 
 

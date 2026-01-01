@@ -12,10 +12,11 @@ license = {text = "MIT"}
 authors = [
   {name = "A. R. Wells", email = "arwells.research@proton.me"},
 ]
+
 dependencies = [
   "numpy",
   "matplotlib",
-  "pyyaml",
+  "PyYAML",
 ]
 
 [project.optional-dependencies]

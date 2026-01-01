@@ -1,0 +1,24 @@
+# Normalize line endings in repo to LF
+* text=auto eol=lf
+
+# Explicit text types
+*.py   text eol=lf
+*.sh   text eol=lf
+*.bash text eol=lf
+*.md   text eol=lf
+*.txt  text eol=lf
+*.toml text eol=lf
+*.yaml text eol=lf
+*.yml  text eol=lf
+*.json text eol=lf
+*.ini  text eol=lf
+*.cfg  text eol=lf
+
+# Data files (still text, keep LF)
+*.csv  text eol=lf
+
+# Binaries
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.pdf  binary

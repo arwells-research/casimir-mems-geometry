@@ -246,7 +246,7 @@ expected=(
   "figures/derived/bao_2010_baseline_dFdd.png"
   "figures/derived/banishev_2013_overlay.png"
 
-  "figures/derived/levelC_c0_overlay.png"
+  "figures/derived/levelc_c0_sinusoid_overlay.png"
   "figures/derived/levelc_c1_sinusoid_a01_overlay.png"
   "figures/derived/levelc_c2_sinusoid_a03_overlay.png"
   "figures/derived/levelc_c3_sinusoid_sweep256_overlay.png"
@@ -260,7 +260,7 @@ expected=(
   "outputs/bao_2010_run.csv"
   "outputs/banishev_2013_run.csv"
 
-  "outputs/levelC_test_run.csv"
+  "outputs/levelc_c0_sinusoid_run.csv"
   "outputs/levelc_c1_sinusoid_a01_run.csv"
   "outputs/levelc_c2_sinusoid_a03_run.csv"
   "outputs/levelc_c3_sinusoid_sweep256_run.csv"
@@ -289,8 +289,8 @@ done
 # Level C CSV schema + invariants
 # -------------------------------
 
-echo "Checking: outputs/levelC_test_run.csv schema..."
-check_levelc_case "LEVELC_C0" "outputs/levelC_test_run.csv" "data/raw/levelc_c0_sinusoid/metadata.yaml"
+echo "Checking: outputs/levelc_c0_sinusoid_run.csv schema..."
+check_levelc_case "LEVELC_C0" "outputs/levelc_c0_sinusoid_run.csv" "data/raw/levelc_c0_sinusoid/metadata.yaml"
 
 echo "Checking: outputs/levelc_c1_sinusoid_a01_run.csv schema..."
 check_levelc_case "LEVELC_C1" "outputs/levelc_c1_sinusoid_a01_run.csv" "data/raw/levelc_c1_sinusoid_a01/metadata.yaml"

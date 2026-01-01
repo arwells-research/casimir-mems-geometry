@@ -43,7 +43,7 @@ OUT_DIR = REPO_ROOT / "outputs"
 
 def banner(tag: str, **kv: object) -> None:
     items = " ".join([f"{k}={v}" for k, v in kv.items()])
-    print(f"[{tag}] {items}".rstrip())
+    print(f"[{tag}] {items}".rstrip(), flush=True)
 
 @dataclass(frozen=True)
 class Bao2010Config:
@@ -53,12 +53,16 @@ class Bao2010Config:
     l1_m: float         # l1 (top length) stored as trench_top_width_l1_m
     h_m: float
     d0_m: float
-
+    y_kind: str
+    y_column: str
 
 def load_config(path: Path) -> Bao2010Config:
     cfg = yaml.safe_load(path.read_text())
     geom = cfg.get("geometry", {})
     cal = cfg.get("calibration", {})
+    dc = cfg.get("data_convention", {}) or {}
+    y_kind = str(dc.get("y_kind", "ratio_over_pfa"))
+    y_column = str(dc.get("y_column", "eta_measured_over_pfa"))
 
     return Bao2010Config(
         sphere_R_m=float(geom["sphere_R_m"]),
@@ -67,17 +71,12 @@ def load_config(path: Path) -> Bao2010Config:
         l1_m=float(geom["trench_top_width_l1_m"]),
         h_m=float(geom["trench_depth_h_m"]),
         d0_m=float(cal.get("d0_m", 0.0)),
+        y_kind=y_kind,
+        y_column=y_column,
     )
 
 
-def load_digitized_ratio_csv(path: Path) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Load a dimensionless ratio curve eta(d) = measured / PFA.
-
-    Required headers:
-    - separation_m
-    - eta_measured_over_pfa
-    """
+def load_digitized_ratio_csv(path: Path, *, y_column: str) -> tuple[np.ndarray, np.ndarray]:
     d_list: list[float] = []
     eta_list: list[float] = []
 
@@ -95,10 +94,10 @@ def load_digitized_ratio_csv(path: Path) -> tuple[np.ndarray, np.ndarray]:
                 header = [c.strip() for c in row]
                 try:
                     d_idx = header.index("separation_m")
-                    e_idx = header.index("eta_measured_over_pfa")
+                    e_idx = header.index(y_column)
                 except ValueError as e:
                     raise ValueError(
-                        "digitized_curve.csv must have headers: separation_m, eta_measured_over_pfa"
+                        f"digitized_curve.csv must have headers: separation_m, {y_column}"
                     ) from e
                 continue
 
@@ -107,13 +106,6 @@ def load_digitized_ratio_csv(path: Path) -> tuple[np.ndarray, np.ndarray]:
 
     d = np.asarray(d_list, dtype=float)
     eta = np.asarray(eta_list, dtype=float)
-
-    if d.ndim != 1 or eta.ndim != 1 or d.size != eta.size or d.size < 2:
-        raise ValueError("Digitized ratio data must be 1D arrays with >= 2 rows.")
-    if np.any(d <= 0.0):
-        raise ValueError("All separations must be > 0.")
-    if np.any(eta <= 0.0):
-        raise ValueError("All eta values must be > 0 (dimensionless ratio).")
 
     order = np.argsort(d)
     return d[order], eta[order]
@@ -237,12 +229,12 @@ def main() -> None:
         raise FileNotFoundError(f"Missing digitized curve: {csv_path}")
 
     cfg = load_config(meta_path)
-    d, eta = load_digitized_ratio_csv(csv_path)
+    d, eta = load_digitized_ratio_csv(csv_path, y_column=cfg.y_column)
 
     banner(
         "BAO2010",
-        y_kind="ratio_over_pfa",
-        y_column="eta_measured_over_pfa",
+        y_kind=cfg.y_kind,
+        y_column=cfg.y_column,
         d_min_nm=f"{float(np.min(d))*1e9:.1f}",
         d_max_nm=f"{float(np.max(d))*1e9:.1f}",
         n_points=int(d.size),
@@ -258,7 +250,7 @@ def main() -> None:
         sentinels_path=SENTINELS_PATH,
         d=d,
         y_curve=eta,
-        curve_label="Bao 2010 digitized ratio eta (measured/PFA)",
+        curve_label=f"Bao 2010 digitized {cfg.y_kind} ({cfg.y_column})",
     )
 
     sphere = Sphere(R=cfg.sphere_R_m)
