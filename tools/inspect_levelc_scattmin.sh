@@ -1,3 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
 python3 - <<'PY'
 import pandas as pd
 import numpy as np
