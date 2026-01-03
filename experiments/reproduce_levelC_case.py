@@ -48,13 +48,23 @@ def banner(tag: str, **kv: object) -> None:
 @dataclass(frozen=True)
 class CaseConfig:
     case_id: str
+    profile: str  # "sinusoid" (default) or "dualharm"
     period_m: float
     d_min_m: float
     d_max_m: float
     n_points: int
+
+    # sinusoid amplitude config
     amplitude_mode: str  # "absolute" or "relative_to_dmin"
     amplitude_m: float
     amplitude_factor: float
+
+    # dual-harmonic extras (used only if profile == "dualharm")
+    amplitude2_mode: str
+    amplitude2_m: float
+    amplitude2_factor: float
+    phi2: float  # radians
+
     kd_warn: float
     kd_refuse: float
     levelc_backend: str
@@ -91,15 +101,35 @@ def load_case_config(case_dir: Path) -> CaseConfig:
     if not case_id:
         raise ValueError("metadata.yaml missing case_id (and directory name is empty?)")
 
+    # Geometry / profile (normalize metadata naming variants)
+    profile_raw = str(geom.get("profile", "sinusoid_1d_vs_flat")).strip().lower()
+    if profile_raw in ("sinusoid", "sinusoid_1d_vs_flat"):
+        profile = "sinusoid"
+    elif profile_raw in ("dualharm", "dualharm_1d_vs_flat"):
+        profile = "dualharm"
+    else:
+        raise ValueError(
+            f"Unsupported geometry.profile={profile_raw!r} "
+            "(supported: sinusoid, sinusoid_1d_vs_flat, dualharm, dualharm_1d_vs_flat)"
+        )
+
     period_m = float(geom["corrugation_period_m"])
     d_min_m = float(geom["d_min_m"])
     d_max_m = float(geom["d_max_m"])
     n_points = int(geom.get("n_points", 41))
 
+    # Sinusoid amplitude (a1)
     amp_cfg = geom.get("amplitude", {}) or {}
     amplitude_mode = str(amp_cfg.get("mode", "relative_to_dmin"))
     amplitude_m = float(amp_cfg.get("a_m", 0.0))
     amplitude_factor = float(amp_cfg.get("a_over_dmin", 0.2))
+
+    # Dual-harmonic amplitude (a2) + phase
+    amp2_cfg = geom.get("amplitude2", {}) or {}
+    amplitude2_mode = str(amp2_cfg.get("mode", "relative_to_dmin"))
+    amplitude2_m = float(amp2_cfg.get("a2_m", 0.0))
+    amplitude2_factor = float(amp2_cfg.get("a2_over_dmin", 0.1))
+    phi2 = float(geom.get("phi2_rad", 0.0))
 
     kd_warn = float(thr.get("kd_warn", thr.get("kd_max", 0.1)))
     kd_refuse = float(thr.get("kd_refuse", float("inf")))
@@ -127,6 +157,7 @@ def load_case_config(case_dir: Path) -> CaseConfig:
 
     return CaseConfig(
         case_id=case_id,
+        profile=profile,
         period_m=period_m,
         d_min_m=d_min_m,
         d_max_m=d_max_m,
@@ -134,6 +165,10 @@ def load_case_config(case_dir: Path) -> CaseConfig:
         amplitude_mode=amplitude_mode,
         amplitude_m=amplitude_m,
         amplitude_factor=amplitude_factor,
+        amplitude2_mode=amplitude2_mode,
+        amplitude2_m=amplitude2_m,
+        amplitude2_factor=amplitude2_factor,
+        phi2=phi2,
         kd_warn=kd_warn,
         kd_refuse=kd_refuse,
         levelc_backend=levelc_backend,
@@ -170,6 +205,24 @@ def resolve_amplitude(cfg: CaseConfig) -> float:
     return a
 
 
+def resolve_amplitude2(cfg: CaseConfig) -> float:
+    """
+    Dual-harmonic second amplitude a2. Only meaningful when cfg.profile == "dualharm".
+    """
+    if cfg.amplitude2_mode == "absolute":
+        a2 = cfg.amplitude2_m
+    elif cfg.amplitude2_mode == "relative_to_dmin":
+        a2 = cfg.amplitude2_factor * cfg.d_min_m
+    else:
+        raise ValueError(f"Unknown amplitude2.mode: {cfg.amplitude2_mode!r}")
+
+    if a2 < 0:
+        raise ValueError("Amplitude2 must be >= 0.")
+    # Note: worst-case local gap for dualharm is d - (a1 + a2) (conservative).
+    # This is not exact for arbitrary phi2, but it is a safe guardrail.
+    return a2
+
+
 def eta_levelA_local_avg(d: np.ndarray, *, a: float, period: float, samples: int = 4096) -> np.ndarray:
     """
     Level A: local averaging of ideal-metal plane-plane pressure.
@@ -190,6 +243,7 @@ def eta_levelA_local_avg(d: np.ndarray, *, a: float, period: float, samples: int
         Pav = float(np.mean(P_pp_ideal(H)))
         out[i] = Pav / float(P0[i])
     return out
+
 
 def write_case_csv(
     path: Path,
@@ -260,8 +314,9 @@ def _build_levelc_core(cfg: CaseConfig, *, etaB: np.ndarray) -> object:
             levelB_samples=cfg.ideal_levelB_samples,
         )
     if cfg.levelc_backend == "ideal_scattering_minimal_v0":
-        return IdealScatteringMinimalBackend()        
+        return IdealScatteringMinimalBackend()
     raise ValueError(f"Unsupported levelC.backend={cfg.levelc_backend!r}")
+
 
 def _build_levelc_core_by_id(backend_id: str, cfg: CaseConfig, *, etaB: np.ndarray) -> object:
     if backend_id == "toy_scattering_v0":
@@ -275,6 +330,7 @@ def _build_levelc_core_by_id(backend_id: str, cfg: CaseConfig, *, etaB: np.ndarr
     if backend_id == "ideal_scattering_minimal_v0":
         return IdealScatteringMinimalBackend()
     raise ValueError(f"Unsupported backend_id={backend_id!r}")
+
 
 def levelB_b0_diagnostics_for_case(
     d: np.ndarray,
@@ -307,6 +363,7 @@ def levelB_b0_diagnostics_for_case(
     )
     return (LEVELB_BACKEND_ID, diag.kd, diag.warned, diag.refused)
 
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--case-dir", required=True, help="Case directory under data/raw/ (or absolute path)")
@@ -327,21 +384,33 @@ def main() -> None:
 
     cfg = load_case_config(case_dir)
     d = build_separation_grid(cfg)
-    a = resolve_amplitude(cfg)
+    a1 = resolve_amplitude(cfg)
+
+    # If dual-harmonic, resolve a2 and enforce a conservative non-intersection guard
+    a2 = 0.0
+    if cfg.profile == "dualharm":
+        a2 = resolve_amplitude2(cfg)
+        if cfg.d_min_m - (a1 + a2) <= 0:
+            raise ValueError(
+                f"Non-positive conservative minimum gap for dualharm: "
+                f"d_min={cfg.d_min_m:.3e}, a1={a1:.3e}, a2={a2:.3e}"
+            )
 
     # B0: compute kd/warn/refuse consistently with Level B validity module
+    # Note: For dualharm, we still use a1 as the representative amplitude for DE validity.
+    # This is acceptable because kd thresholds are geometric proxies for refusal masking.
     levelB_backend_id, kd, warned, refused = levelB_b0_diagnostics_for_case(
         d,
-        amplitude_m=a,
+        amplitude_m=a1,
         period_m=cfg.period_m,
         kd_warn=cfg.kd_warn,
         kd_refuse=cfg.kd_refuse,
     )
 
-    etaA = eta_levelA_local_avg(d, a=a, period=cfg.period_m, samples=4096)
+    etaA = eta_levelA_local_avg(d, a=a1, period=cfg.period_m, samples=4096)
 
-    # Frozen Level B curve (ideal-metal DE)
-    etaB = eta_levelB_DE_ideal(d, a=a, period=cfg.period_m, samples=4096)
+    # Frozen Level B curve (ideal-metal DE) computed for the primary harmonic.
+    etaB = eta_levelB_DE_ideal(d, a=a1, period=cfg.period_m, samples=4096)
 
     core = _build_levelc_core(cfg, etaB=etaB)
 
@@ -355,6 +424,7 @@ def main() -> None:
     banner(
         "LEVELC_CASE",
         case_id=cfg.case_id,
+        profile=cfg.profile,
         period_m=f"{cfg.period_m:.3e}",
         d_min_m=f"{cfg.d_min_m:.3e}",
         d_max_m=f"{cfg.d_max_m:.3e}",
@@ -367,9 +437,27 @@ def main() -> None:
     )
 
     backend = ModeSweepBackend(core=core, sweep=sweep)
-    resC = backend.compute_sinusoid(
-        d, a=a, period=cfg.period_m, n_modes=cfg.n_modes_start, tol=cfg.tol, refused=refused
-    )
+
+    # Dispatch Level C based on geometry profile.
+    if cfg.profile == "sinusoid":
+        resC = backend.compute_sinusoid(
+            d, a=a1, period=cfg.period_m, n_modes=cfg.n_modes_start, tol=cfg.tol, refused=refused
+        )
+        title_geom = "sinusoid vs flat"
+    else:
+        # requires core backend to implement compute_dualharm (scattmin will).
+        # ModeSweepBackend must also provide compute_dualharm that forwards to core.
+        resC = backend.compute_dualharm(
+            d,
+            a1=a1,
+            a2=a2,
+            period=cfg.period_m,
+            phi2=cfg.phi2,
+            n_modes=cfg.n_modes_start,
+            tol=cfg.tol,
+            refused=refused,
+        )
+        title_geom = f"dualharm (phi2={cfg.phi2:.3g} rad) vs flat"
 
     case_tag = cfg.case_id.split("_", 2)[1].upper()  # "c1" -> "C1"
     print(f"[LEVELC_{case_tag}] Level C core calls: {getattr(core, 'call_count', -1)}")
@@ -407,7 +495,8 @@ def main() -> None:
     plt.plot(d, resC.eta_levelC, linestyle="-.", label=f"Level C: {cfg.levelc_backend}")
 
     # Optional diagnostic: compare Level C backends on the same geometry/grid.
-    if args.compare_backends:
+    # Note: comparison is only defined for sinusoid cases in this harness.
+    if args.compare_backends and cfg.profile == "sinusoid":
         compare_ids = [
             "toy_scattering_v0",
             "ideal_perturb_scattering_v0",
@@ -418,7 +507,7 @@ def main() -> None:
             core_cmp = _build_levelc_core_by_id(bid, cfg, etaB=etaB)
             backend_cmp = ModeSweepBackend(core=core_cmp, sweep=sweep)
             res_cmp = backend_cmp.compute_sinusoid(
-                d, a=a, period=cfg.period_m, n_modes=cfg.n_modes_start, tol=cfg.tol, refused=refused
+                d, a=a1, period=cfg.period_m, n_modes=cfg.n_modes_start, tol=cfg.tol, refused=refused
             )
 
             if bid == cfg.levelc_backend:
@@ -447,7 +536,7 @@ def main() -> None:
         idx = np.where(~resC.converged)[0]
         plt.plot(d[idx], resC.eta_levelC[idx], marker="x", linestyle="none", label="Level C: not converged")
 
-    title1 = f"Level C case {cfg.case_id}: sinusoid vs flat"
+    title1 = f"Level C case {cfg.case_id}: {title_geom}"
     title2 = f"sweep {sweep.n_modes_start}..{sweep.n_modes_max} step {sweep.n_modes_step} | tol={sweep.tol:.1e}"
     plt.title(title1 + "\n" + title2, fontsize=11)
     plt.xlabel("Separation d (m)")

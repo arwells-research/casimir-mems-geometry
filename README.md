@@ -421,6 +421,7 @@ It is deliberately **not** a full Lifshitz or electromagnetic scattering solver.
 Instead, it provides a controlled geometric baseline that remains well behaved
 in regimes where Levels A and B fail.
 
+
 #### Defining characteristics
 
 - **Explicit lateral mode coupling** via a truncated Fourier basis
@@ -527,8 +528,52 @@ C4–C7 benchmark suite.
   - stable convergence under mode-count sweeping,
   - explicit failure of local and DE-based models in the same regime.
 
-A Level C backend is considered valid when **all declared cases reproduce
-under `tools/repro.sh` with locked CSV schema, refusal behavior, and convergence
+  - **C12–C14**  
+  Dual-harmonic phase-sensitivity cases using `ideal_scattering_minimal_v0`.  
+  These establish a **real geometry claim** for Level C.
+
+Cases **C12–C14** demonstrate that Level C resolves **geometry beyond local or
+derivative-expansion descriptions**, even in a fully synthetic, idealized
+setting.
+
+These cases use a **dual-harmonic 1D surface profile** with identical amplitudes
+and wavelength, differing **only in the relative phase** of the second harmonic:
+
+- **C12**: φ₂ = 0  
+- **C13**: φ₂ = π/2  
+- **C14**: φ₂ = π  
+
+Across all three cases:
+
+- **Level A (local averaging)** and **Level B (ideal-metal DE)** curves are
+  **identical by construction**.
+- The same **refusal mask** applies (36/41 trusted points in all cases).
+- Only **Level C** changes with φ₂.
+
+On trusted points, the minimal log-det / mode-mixing backend
+(`ideal_scattering_minimal_v0`) produces structured, phase-dependent shifts in
+the normalized observable η_C(d):
+
+- max |Δη_C|(φ₂ = π/2 − 0) ≈ **4.13×10⁻³**  
+- max |Δη_C|(φ₂ = π − 0) ≈ **8.26×10⁻³** (≈ 2× larger)  
+- max |Δη_C|(φ₂ = π − π/2) ≈ **4.13×10⁻³**
+
+This behavior demonstrates that **explicit nonlocal geometric mode coupling**
+alone is sufficient to produce **spectrum- and phase-sensitive responses** that
+are invisible to local or weakly nonlocal models.
+
+These cases therefore establish a **Level C geometry claim**. This claim is about **Level C capability**, not physical correctness of the underlying interaction model.:
+
+> η_C(d) depends on the **spectral content and relative phase** of the surface
+> profile, even when lower-level models are held fixed.
+
+This claim is **synthetic, ideal-conductor, and not electromagnetically complete
+by design**, but it is **bounded, reproducible, and contract-stable**, and it
+marks the point at which Level C becomes a genuine **geometry-resolving
+framework**, rather than an extension of sinusoidal benchmarks.
+
+A Level C backend is considered valid only if **all declared cases reproduce
+under `tools/repro.sh` with locked CSV schema, refusal masking, and convergence
 sentinels**.
 
 ---

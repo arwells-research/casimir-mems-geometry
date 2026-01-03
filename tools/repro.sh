@@ -116,6 +116,45 @@ else:
 PY
 }
 
+check_dualharm_phase_ordering() {
+  local csv0="$1" csv90="$2" csv180="$3"
+  echo "Checking: [LEVELC_C12..C14] dualharm phase-ordering sentinel..."
+
+  $PYTHON - <<PY
+import pandas as pd
+
+c0 = pd.read_csv("$csv0")[["separation_m","eta_levelC","n_modes","converged"]].rename(
+    columns={"eta_levelC":"eta0","n_modes":"nm0","converged":"cv0"}
+)
+c90 = pd.read_csv("$csv90")[["separation_m","eta_levelC","n_modes","converged"]].rename(
+    columns={"eta_levelC":"eta90","n_modes":"nm90","converged":"cv90"}
+)
+c180 = pd.read_csv("$csv180")[["separation_m","eta_levelC","n_modes","converged"]].rename(
+    columns={"eta_levelC":"eta180","n_modes":"nm180","converged":"cv180"}
+)
+
+m = c0.merge(c90, on="separation_m").merge(c180, on="separation_m")
+
+trusted = (m["nm0"]>0) & (m["nm90"]>0) & (m["nm180"]>0) & (m["cv0"]==1) & (m["cv90"]==1) & (m["cv180"]==1)
+if trusted.sum() < 10:
+    raise SystemExit(f"Too few trusted points for phase sentinel: {trusted.sum()}")
+
+d90  = (m.loc[trusted,"eta90"]  - m.loc[trusted,"eta0"]).abs().max()
+d180 = (m.loc[trusted,"eta180"] - m.loc[trusted,"eta0"]).abs().max()
+
+# Minimal invariant: pi shift >= pi/2 shift
+if d180 < d90:
+    raise SystemExit(f"Phase ordering failed: max|Δ|(180-0)={d180} < max|Δ|(90-0)={d90}")
+
+# Nonzero effect
+eps = 1e-6
+if d90 <= eps:
+    raise SystemExit(f"Phase sensitivity collapsed: max|Δ|(90-0)={d90} <= {eps}")
+
+print(f"OK: phase ordering: max|Δ|(90-0)={d90:.6g}, max|Δ|(180-0)={d180:.6g}, trusted={trusted.sum()}")
+PY
+}
+
 check_levelc_core_calls() {
   local case_tag="$1" want_min_calls="$2"
   echo "Checking: [$case_tag] core call-count sentinel..."
@@ -224,6 +263,18 @@ echo "Running: Level C benchmark (C11 scatt-min sweep stress) ..."
 $PYTHON experiments/reproduce_levelC_case.py --case-dir data/raw/levelc_c11_scattmin_sweep256
 check_levelc_core_calls "LEVELC_C11" 2
 
+echo "Running: Level C benchmark (C12 dualharm phi0) ..."
+$PYTHON experiments/reproduce_levelC_case.py --case-dir data/raw/levelc_c12_dualharm_phi0
+check_levelc_core_calls "LEVELC_C12" 2
+
+echo "Running: Level C benchmark (C13 dualharm phi90) ..."
+$PYTHON experiments/reproduce_levelC_case.py --case-dir data/raw/levelc_c13_dualharm_phi90
+check_levelc_core_calls "LEVELC_C13" 2
+
+echo "Running: Level C benchmark (C14 dualharm phi180) ..."
+$PYTHON experiments/reproduce_levelC_case.py --case-dir data/raw/levelc_c14_dualharm_phi180
+check_levelc_core_calls "LEVELC_C14" 2
+
 # -------------------------------
 # Level B
 # -------------------------------
@@ -278,6 +329,13 @@ expected=(
   "outputs/levelc_c9_scattmin_a01_run.csv"
   "outputs/levelc_c10_scattmin_a03_run.csv"
   "outputs/levelc_c11_scattmin_sweep256_run.csv"  
+
+  "figures/derived/levelc_c12_dualharm_phi0_overlay.png"
+  "figures/derived/levelc_c13_dualharm_phi90_overlay.png"
+  "figures/derived/levelc_c14_dualharm_phi180_overlay.png"
+  "outputs/levelc_c12_dualharm_phi0_run.csv"
+  "outputs/levelc_c13_dualharm_phi90_run.csv"
+  "outputs/levelc_c14_dualharm_phi180_run.csv"
 )
 
 for f in "${expected[@]}"; do
@@ -325,6 +383,20 @@ check_levelc_case "LEVELC_C10" "outputs/levelc_c10_scattmin_a03_run.csv" "data/r
 echo "Checking: outputs/levelc_c11_scattmin_sweep256_run.csv schema..."
 check_levelc_case "LEVELC_C11" "outputs/levelc_c11_scattmin_sweep256_run.csv" "data/raw/levelc_c11_scattmin_sweep256/metadata.yaml"
 
+echo "Checking: outputs/levelc_c12_dualharm_phi0_run.csv schema..."
+check_levelc_case "LEVELC_C12" "outputs/levelc_c12_dualharm_phi0_run.csv" "data/raw/levelc_c12_dualharm_phi0/metadata.yaml"
+
+echo "Checking: outputs/levelc_c13_dualharm_phi90_run.csv schema..."
+check_levelc_case "LEVELC_C13" "outputs/levelc_c13_dualharm_phi90_run.csv" "data/raw/levelc_c13_dualharm_phi90/metadata.yaml"
+
+echo "Checking: outputs/levelc_c14_dualharm_phi180_run.csv schema..."
+check_levelc_case "LEVELC_C14" "outputs/levelc_c14_dualharm_phi180_run.csv" "data/raw/levelc_c14_dualharm_phi180/metadata.yaml"
+
+check_dualharm_phase_ordering \
+  "outputs/levelc_c12_dualharm_phi0_run.csv" \
+  "outputs/levelc_c13_dualharm_phi90_run.csv" \
+  "outputs/levelc_c14_dualharm_phi180_run.csv"
+
 echo "OK: all expected outputs verified."
 
 # -------------------------------
@@ -362,6 +434,9 @@ cids=(
   levelc_c9_scattmin_a01
   levelc_c10_scattmin_a03
   levelc_c11_scattmin_sweep256
+  levelc_c12_dualharm_phi0
+  levelc_c13_dualharm_phi90
+  levelc_c14_dualharm_phi180
 )
 for cid in "${cids[@]}"; do
   grep -Fq "case_id=${cid}" "$LOG_PATH" || {

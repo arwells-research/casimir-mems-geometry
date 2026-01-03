@@ -1,0 +1,65 @@
+paper: "Canonical Level C benchmark C12 (synthetic dual-harmonic)"
+observable: "normalized_ratio"
+
+geometry:
+  profile: "dualharm_1d_vs_flat"
+  corrugation_period_m: 5.705e-07        # reuse Banishev period for comparable kd
+  d_min_m: 1.20e-07
+  d_max_m: 6.00e-07
+  n_points: 41
+
+  # primary amplitude definition (a1):
+  #   mode = "relative_to_dmin": a1 = a_over_dmin * d_min
+  #   mode = "absolute":         a1 = a_m
+  amplitude:
+    mode: "relative_to_dmin"
+    a_over_dmin: 0.2
+    a_m: 0.0
+
+  # second harmonic amplitude definition (a2):
+  #   mode = "relative_to_dmin": a2 = a2_over_dmin * d_min
+  #   mode = "absolute":         a2 = a2_m
+  amplitude2:
+    mode: "relative_to_dmin"
+    a2_over_dmin: 0.1
+    a2_m: 0.0
+
+  # phase of the 2nd harmonic term cos(2kx + phi2)
+  phi2_rad: 0.0
+
+thresholds:
+  kd_warn: 1.0
+  kd_refuse: 8.0
+
+data_convention:
+  y_kind: "ratio_over_flat"
+  y_column: "eta_synthetic"
+  sign: "positive"
+
+paper: "Canonical Level C benchmark C12 (synthetic dual-harmonic; minimal-backend)"
+
+scope:
+  levelB:
+    de_model: "ideal_conductor_em"
+    intent: "diagnostic_bridge"
+    disclaimer: >
+      Level B uses ideal-conductor EM derivative expansion to quantify geometric
+      beyond-PFA sensitivity. Banishev 2013 data are Au at 300 K; mismatches are
+      expected and indicate finite conductivity/temperature effects reserved for
+      Level C.
+    notes: "Uses Bimonte beta_EM constant for ideal metals; not Au optical data."
+    # later: "lifshitz_au_300k" or "tabulated_alpha(d)" etc.
+
+levelC:
+  backend: "ideal_scattering_minimal_v0"
+  purpose: "synthetic_geometry_claim"
+  notes: >
+    Minimal log-det / mode-mixing backend for ideal reflectors.
+    Synthetic case used to demonstrate spectrum sensitivity beyond a pure sinusoid.
+    This is still not a full EM scattering solver; it is a geometry-first, bounded
+    nonlocal coupling construction.
+  convergence:
+    n_modes_start: 16
+    n_modes_step: 16
+    n_modes_max: 256
+    tol: 1.0e-5
