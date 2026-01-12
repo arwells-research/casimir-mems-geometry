@@ -4,7 +4,7 @@
 **Affiliation:** Dual-Frame Research Group  
 **License:** MIT  
 **Repository:** `arwells-research/casimir-mems-geometry`  
-**Status:** Level A complete; Level B in progress (no commit gate until B)
+**Status:** Level A complete; Level B diagnostics complete; Level C milestones C1–C14 complete (C15 next)
 
 ---
 
@@ -13,6 +13,9 @@
 This repository provides a clean, reproducible Python pipeline for validating Casimir-force modeling against canonical **geometry-dependent** experimental benchmarks.
 
 The project is organized as a leveled contract:
+
+Level C progress through C14 establishes internal, synthetic geometry invariants;
+C15 is reserved for confrontation with real experimental datasets.
 
 - **Level A (Local PFA / area averaging)**: fast, robust baselines; correct limits; used for sanity checks and audit curves.
 - **Level B (Derivative Expansion / DE)**: smooth-profile corrections to PFA, with explicit validity/refusal logic.
@@ -41,6 +44,14 @@ NOTE: The tree below is shown in plain indented format to avoid nested fenced bl
 
 This repository tracks **source + raw data**. Generated outputs (CSVs/PNGs) are produced locally and should be ignored (see `.gitignore`).
 
+Directory naming convention (Level C):
+
+- `levelc_c0_*` — canonical synthetic reference cases (infrastructure lock)
+- `levelc_c1–c11_*` — sinusoidal and scattering-minimization baselines and stress tests
+- `levelc_c12–c14_*` — dual-harmonic geometry-invariant cases (φ = 0°, π/2, π)
+- External experiment folders (`chan_2008`, `bao_2010`, `banishev_2013`) are prepared
+  datasets and are not yet executed as Level C cases (reserved for C15).
+  
     casimir-mems-geometry/
     ├── pyproject.toml
     ├── LICENSE
@@ -210,6 +221,9 @@ toolkit**, rather than evolving into a Lifshitz optical-data solver.
 ---
 
 ## Level C (Nonlocal / Scattering Geometry)
+
+**Status:** Level C synthetic validation complete through **C14**.
+C15 (external experimental confrontation) is the next milestone.
 
 Level C addresses regimes where **explicit nonlocal geometric mode coupling**
 invalidates both local averaging (Level A) and weakly nonlocal expansions
@@ -528,9 +542,18 @@ C4–C7 benchmark suite.
   - stable convergence under mode-count sweeping,
   - explicit failure of local and DE-based models in the same regime.
 
-  - **C12–C14**  
+- **C12–C14**  
   Dual-harmonic phase-sensitivity cases using `ideal_scattering_minimal_v0`.  
-  These establish a **real geometry claim** for Level C.
+  These complete the internal Level C synthetic validation suite.
+ 
+  **Scope boundary:**  
+  Level C results reported here through **C14** are synthetic and internal.
+  No Level C claim based on real experimental data is made until **C15**
+  is completed and explicitly documented.
+
+- **C15 (planned)**  
+  Execution of Level C backends against real experimental datasets
+  (`chan_2008`, `bao_2010`, `banishev_2013`) under locked protocols.
 
 Cases **C12–C14** demonstrate that Level C resolves **geometry beyond local or
 derivative-expansion descriptions**, even in a fully synthetic, idealized
