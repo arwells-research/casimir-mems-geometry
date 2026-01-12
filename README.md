@@ -51,6 +51,7 @@ Directory naming convention (Level C):
 - `levelc_c12–c14_*` — dual-harmonic geometry-invariant cases (φ = 0°, π/2, π)
 - External experiment folders (`chan_2008`, `bao_2010`, `banishev_2013`) are prepared
   datasets and are not yet executed as Level C cases (reserved for C15).
+<!-- end list -->
   
     casimir-mems-geometry/
     ├── pyproject.toml
@@ -71,8 +72,11 @@ Directory naming convention (Level C):
     │   │   │   ├── digitized_curve.csv
     │   │   │   ├── metadata.yaml
     │   │   │   └── sentinels.yaml
-    │   │   └── levelc_c0_sinusoid/
-    │   │       └── metadata.yaml     # synthetic benchmark (no digitized_curve.csv)    
+    |   │   ├── levelc_c0_sinusoid/              # metadata.yaml
+    |   │   ├── levelc_c1–c3_sinusoid_*/         # metadata.yaml
+    |   │   ├── levelc_c4–c7_idealpert_*/        # metadata.yaml
+    |   │   ├── levelc_c8–c11_scattmin_*/        # metadata.yaml
+    |   │   └── levelc_c12–c14_dualharm_phi*/    # metadata.yaml
     │   └── derived/              # generated locally (ignored)
     ├── figures/
     │   └── derived/              # generated locally (ignored)
